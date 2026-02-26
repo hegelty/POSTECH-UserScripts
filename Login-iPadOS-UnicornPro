@@ -1,0 +1,115 @@
+// ==UserScript==
+// @name         POSTECH Auto Login & PLMS Redirect for iPad & Unicorn Pro
+// @namespace    https://sso.postech.ac.kr
+// @version      0.0.1
+// @description  포스텍 통합 로그인 (iPadOS Safari + Unicorn Pro용)
+// @match        https://sso.postech.ac.kr/*
+// @match        https://plms.postech.ac.kr/login/index.php
+// @grant        none
+// @author       hegelty
+// ==/UserScript==
+
+(function() {
+  'use strict';
+
+  const url = window.location.href;
+
+  // 1. PLMS 로그인 페이지 접속 시 리다이렉트
+  if (url.startsWith('https://plms.postech.ac.kr/login/index.php')) {
+    window.location.replace('https://plms.postech.ac.kr/passni/sso/spLogin.php');
+    return;
+  }
+
+  // 2. SSO 자동 로그인 로직
+  if (url.includes('sso.postech.ac.kr')) {
+    
+    // 모바일 환경의 비동기 로딩을 잡기 위해 0.5초마다 폼이 있는지 확인
+    const checkExist = setInterval(function() {
+      const idField = document.querySelector('#login_id');
+      const pwField = document.querySelector('#login_pwd');
+
+      if (idField && pwField) {
+        clearInterval(checkExist); // 요소를 찾으면 탐색 중지
+
+        // GM_setValue 대신 브라우저 네이티브 localStorage 사용
+        const savedId = localStorage.getItem('postech_sso_id');
+        const savedPw = localStorage.getItem('postech_sso_pw');
+
+        if (savedId && savedPw) {
+          // 저장된 정보가 있으면 바로 로그인
+          idField.value = savedId;
+          pwField.value = savedPw;
+          executeLogin();
+        } else {
+          // 저장된 정보가 없으면 화면 하단에 입력 UI 띄우기
+          createMobileUI(idField, pwField);
+        }
+      }
+    }, 500);
+  }
+
+  // --- 로그인 실행 공통 함수 ---
+  function executeLogin() {
+    if (typeof loginProc === 'function') {
+      loginProc(); 
+    } else {
+      const loginForm = document.getElementsByName('loginForm')[0];
+      if (loginForm) loginForm.submit();
+    }
+  }
+
+  // --- 모바일 터치 친화적 UI 생성 함수 ---
+  function createMobileUI(idField, pwField) {
+    if (document.getElementById('postech-sso-ui')) return; // 중복 생성 방지
+
+    // iPad/iPhone 화면 하단에 깔끔하게 뜨도록 스타일링된 HTML
+    const uiHTML = `
+      <div id="postech-sso-ui" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 20px; background-color: #ffffff; border: 1px solid #ddd; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); z-index: 999999; width: 90%; max-width: 350px; box-sizing: border-box; text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+        <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333; font-weight: 600;">POSTECH 자동 로그인 설정</h3>
+        <p style="margin: 0 0 16px 0; font-size: 13px; color: #666;">기기 자체 브라우저 저장소에 안전하게 보관됩니다.</p>
+        
+        <input type="text" id="postech-id-input" placeholder="POVIS ID" style="width: 100%; box-sizing: border-box; margin-bottom: 12px; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: #f9f9f9;">
+        <input type="password" id="postech-pw-input" placeholder="Password" style="width: 100%; box-sizing: border-box; margin-bottom: 16px; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; background: #f9f9f9;">
+        
+        <button id="postech-save-btn" style="width: 100%; padding: 14px; background-color: #ce2029; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 8px;">저장 및 로그인</button>
+        <button id="postech-close-btn" style="width: 100%; padding: 12px; background-color: transparent; color: #888; border: none; font-size: 14px; cursor: pointer;">닫기 (자동로그인 사용안함)</button>
+      </div>
+    `;
+
+    // body의 맨 끝에 안전하게 삽입
+    document.body.insertAdjacentHTML('beforeend', uiHTML);
+
+    const idInput = document.getElementById('postech-id-input');
+    const pwInput = document.getElementById('postech-pw-input');
+    const saveBtn = document.getElementById('postech-save-btn');
+    const closeBtn = document.getElementById('postech-close-btn');
+
+    // 저장 버튼 터치 이벤트
+    saveBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = idInput.value.trim();
+      const pw = pwInput.value.trim();
+
+      if (id && pw) {
+        // localStorage에 저장 (Unicorn Pro의 제약을 받지 않음)
+        localStorage.setItem('postech_sso_id', id);
+        localStorage.setItem('postech_sso_pw', pw);
+
+        idField.value = id;
+        pwField.value = pw;
+        document.getElementById('postech-sso-ui').remove(); // 창 닫기
+
+        executeLogin();
+      } else {
+        idInput.style.borderColor = '#ce2029';
+        pwInput.style.borderColor = '#ce2029';
+      }
+    });
+
+    // 닫기 버튼 터치 이벤트
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      document.getElementById('postech-sso-ui').remove();
+    });
+  }
+})();
