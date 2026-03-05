@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         POSTECH Auto Login & PLMS Redirect
 // @namespace    https://sso.postech.ac.kr
-// @version      2.2.0
+// @version      2.3.0
 // @description  포스텍 통합 로그인 자동화 및 PLMS 로그인 페이지 리다이렉트
 // @match        https://sso.postech.ac.kr/*
 // @match        https://plms.postech.ac.kr/login/index.php
@@ -23,23 +23,9 @@
     return;
   }
 
-  // 1-1. Podium 로그인 페이지 진입 시 fnLogin() 자동 호출
+  // 1-1. Podium
   if (url.startsWith('https://podium.postech.ac.kr/common/login/login.do')) {
-    window.addEventListener('load', () => {
-      let attempts = 0;
-      const maxAttempts = 20;
-      const timer = setInterval(() => {
-        attempts += 1;
-        if (typeof window.fnLogin === 'function') {
-          clearInterval(timer);
-          window.fnLogin();
-          return;
-        }
-        if (attempts >= maxAttempts) {
-          clearInterval(timer);
-        }
-      }, 200);
-    });
+    window.location.replace('/SSOService.do');
     return;
   }
 
